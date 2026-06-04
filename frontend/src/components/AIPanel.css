@@ -1,0 +1,23 @@
+.ai-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ai-lang-chips { display: flex; gap: 4px; }
+.chip {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+.chip:hover:not(.active) { border-color: var(--primary); color: var(--primary); }
+button.small { padding: 4px 10px; font-size: 11px; }
+.glory-editor { position: absolute; top: 100%; right: 0; z-index: 20; background: white; border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; margin-top: 4px; box-shadow: var(--shadow); }
+.glory-editor textarea { width: 240px; min-height: 80px; font-size: 12px; }
+.hint { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }

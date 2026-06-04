@@ -1,0 +1,27 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+
+# Uploads
+backend/uploads/*
+
+# Test artifacts
+backend/consistency_report.json
+
+# IDE
+.vscode/
+.idea/
+.playwright-mcp/
+
+# Claude Code
+.claude/
+*.png

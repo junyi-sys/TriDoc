@@ -1,0 +1,15 @@
+.file-upload-wrap { display: flex; align-items: center; gap: 8px; }
+.drop-zone {
+  padding: 6px 14px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.drop-zone:hover { border-color: var(--primary); background: #f8f9ff; }
+.drop-zone.drag-over { border-color: var(--primary); background: #e8f0fe; }
+.drop-zone.disabled { opacity: 0.5; cursor: not-allowed; }
+.upload-text { font-size: 13px; color: var(--text-secondary); }
+.upload-icon { margin-right: 4px; }
+.upload-error { color: var(--danger); font-size: 12px; }
