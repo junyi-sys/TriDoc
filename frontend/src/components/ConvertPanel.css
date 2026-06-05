@@ -1,0 +1,29 @@
+.convert-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.convert-panel select {
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+}
+
+.convert-progress {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+}
+
+.btn-dl {
+  background: #28a745;
+  color: #fff;
+  border: none;
+}
+.btn-dl:hover {
+  background: #218838;
+}

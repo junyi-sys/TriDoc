@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
@@ -89,8 +90,8 @@ def extract_document(file_id: str):
             result["sidecar"] = {
                 "source_language": sidecar.get("source_language", ""),
                 "has_edits": "edited" in sidecar,
-                "translations": list(sidecar.get("translations", {}).keys()),
-                "final": list(sidecar.get("final", {}).keys()),
+                "translations": sidecar.get("translations", {}),
+                "final": sidecar.get("final", {}),
             }
         return result
     except FileNotFoundError:
@@ -125,71 +126,112 @@ def save_edits(file_id: str, req: ExtractSaveRequest):
 # ============================================================================
 @router.post("/ai/polish/{file_id}")
 def polish_document(file_id: str, req: TranslateRequest):
-    """仅润色原文（Stage 0 + Stage 1）。"""
+    """仅润色原文（Stage 0 + Stage 1）— 异步执行。"""
     sidecar = _load_sidecar(file_id)
     pages = _get_source_pages(file_id, sidecar)
 
-    result = run_pipeline(
-        file_id=file_id,
-        pages=pages,
-        source_lang=req.source_language,
-        target_langs=[req.source_language],  # 只润色原文
-        glossary=req.glossary,
-        skip_polish=False,
-        skip_post_polish=True,
-    )
-
-    # 保存结果
-    sidecar["polished"] = {"pages": result.final_pages.get(req.source_language, pages)}
-    sidecar["consistency_report"] = result.consistency_report
+    sidecar["pipeline_status"] = {"running": True, "stage": "准备中", "progress": 0}
     _save_sidecar(file_id, sidecar)
 
-    return {
-        "status": "done",
-        "polished_pages": len(pages),
-        "consistency": result.consistency_report,
-    }
+    def _run():
+        try:
+            def _progress(name, cur, total):
+                sidecar["pipeline_status"] = {"running": True, "stage": name, "progress": int(cur / total * 100)}
+                _save_sidecar(file_id, sidecar)
+
+            result = run_pipeline(
+                file_id=file_id,
+                pages=pages,
+                source_lang=req.source_language,
+                target_langs=[req.source_language],
+                glossary=req.glossary,
+                skip_polish=False,
+                skip_post_polish=True,
+                progress_callback=_progress,
+            )
+
+            sidecar["polished"] = {"pages": result.final_pages.get(req.source_language, pages)}
+            sidecar["consistency_report"] = result.consistency_report
+            sidecar["pipeline_status"] = {"running": False, "stage": "完成", "progress": 100, "polished_pages": len(pages)}
+            _save_sidecar(file_id, sidecar)
+        except Exception as exc:
+            sidecar["pipeline_status"] = {"running": False, "stage": "失败", "progress": 0, "error": str(exc)}
+            _save_sidecar(file_id, sidecar)
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started"}
 
 
 @router.post("/ai/translate/{file_id}")
 def translate_document(file_id: str, req: TranslateRequest):
-    """翻译文档 — 执行完整 AI 管线（Stage 0→1→2→2.5→3→4）。"""
+    """翻译文档 — 异步执行完整 AI 管线（Stage 0→1→2→2.5→3→4）。"""
     sidecar = _load_sidecar(file_id)
     pages = _get_source_pages(file_id, sidecar)
 
-    result = run_pipeline(
-        file_id=file_id,
-        pages=pages,
-        source_lang=req.source_language,
-        target_langs=req.target_languages,
-        glossary=req.glossary,
-        skip_polish=req.skip_polish,
-        skip_post_polish=req.skip_post_polish,
-    )
-
-    # 保存翻译结果
-    sidecar["source_language"] = req.source_language
-    if "translations" not in sidecar:
-        sidecar["translations"] = {}
-    for lang, pages in result.final_pages.items():
-        sidecar["translations"][lang] = pages
-
-    if "final" not in sidecar:
-        sidecar["final"] = {}
-    for lang, pages in result.final_pages.items():
-        sidecar["final"][lang] = pages
-
-    sidecar["consistency_report"] = result.consistency_report
-    sidecar["stats"] = result.stats
+    sidecar["pipeline_status"] = {"running": True, "stage": "准备中", "progress": 0}
     _save_sidecar(file_id, sidecar)
 
-    return {
-        "status": "done" if result.success else "partial",
-        "target_languages": result.target_langs,
-        "stats": result.stats,
-        "consistency": result.consistency_report,
-        "errors": result.errors,
-    }
+    def _run():
+        try:
+            def _progress(name, cur, total):
+                sidecar["pipeline_status"] = {"running": True, "stage": name, "progress": int(cur / total * 100)}
+                _save_sidecar(file_id, sidecar)
+
+            result = run_pipeline(
+                file_id=file_id,
+                pages=pages,
+                source_lang=req.source_language,
+                target_langs=req.target_languages,
+                glossary=req.glossary,
+                skip_polish=req.skip_polish,
+                skip_post_polish=req.skip_post_polish,
+                progress_callback=_progress,
+            )
+
+            # 保存翻译结果
+            sidecar["source_language"] = req.source_language
+            if "translations" not in sidecar:
+                sidecar["translations"] = {}
+            for lang, pgs in result.final_pages.items():
+                sidecar["translations"][lang] = pgs
+
+            if "final" not in sidecar:
+                sidecar["final"] = {}
+            for lang, pgs in result.final_pages.items():
+                sidecar["final"][lang] = pgs
+
+            sidecar["consistency_report"] = result.consistency_report
+            sidecar["stats"] = result.stats
+            sidecar["pipeline_status"] = {
+                "running": False, "stage": "完成", "progress": 100,
+                "success": result.success, "stats": result.stats,
+                "errors": result.errors,
+                "target_languages": result.target_langs,
+            }
+            _save_sidecar(file_id, sidecar)
+        except Exception as exc:
+            logger.exception("管线失败: %s", exc)
+            sidecar["pipeline_status"] = {"running": False, "stage": "失败", "progress": 0, "error": str(exc)}
+            _save_sidecar(file_id, sidecar)
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started"}
+
+
+@router.get("/ai/status/{file_id}")
+def pipeline_status(file_id: str):
+    """查询管线执行进度。"""
+    sidecar = _load_sidecar(file_id)
+    status = sidecar.get("pipeline_status")
+    if not status:
+        return {"running": False, "stage": "未开始", "progress": 0}
+
+    resp = dict(status)
+    # 如果已完成，附带结果摘要
+    if not status.get("running"):
+        resp["translations"] = list(sidecar.get("final", sidecar.get("translations", {})).keys())
+        resp["consistency"] = sidecar.get("consistency_report")
+    return resp
 
 
 @router.post("/ai/align/{file_id}")

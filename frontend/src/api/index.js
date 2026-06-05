@@ -49,5 +49,22 @@ export const exportDoc = (fileId, targetLang, mode = 'translated') =>
     responseType: 'blob',
   })
 
+// Pipeline status
+export const getPipelineStatus = (fileId) => api.get(`/ai/status/${fileId}`)
+
+// Conversion
+export const startConversion = (fileId, targetFormat) =>
+  api.post(`/convert/${fileId}`, { target_format: targetFormat })
+
+export const getConversionStatus = (fileId) => api.get(`/convert/status/${fileId}`)
+
+export const downloadConversion = (fileId, targetFormat) =>
+  api.get(`/convert/download/${fileId}`, {
+    params: { target_format: targetFormat },
+    responseType: 'blob',
+  })
+
+export const getConversionFormats = () => api.get('/convert/formats')
+
 // Health
 export const healthCheck = () => api.get('/health')

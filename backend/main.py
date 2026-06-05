@@ -51,10 +51,15 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # 路由
 # ---------------------------------------------------------------------------
-from routers import files, documents
+from routers import files, documents, conversion
 
 app.include_router(files.router, prefix="/api", tags=["Files"])
 app.include_router(documents.router, prefix="/api", tags=["Documents"])
+app.include_router(conversion.router, prefix="/api", tags=["Conversion"])
+
+# Ensure cache directory exists
+CACHE_DIR = BASE_DIR / "cache" / "conversions"
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ---------------------------------------------------------------------------

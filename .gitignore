@@ -14,6 +14,9 @@ dist/
 # Uploads
 backend/uploads/*
 
+# Conversion cache
+backend/cache/conversions/*
+
 # Test artifacts
 backend/consistency_report.json
 

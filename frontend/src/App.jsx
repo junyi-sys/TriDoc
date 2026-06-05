@@ -1,11 +1,13 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import FileUpload from './components/FileUpload'
 import PageList from './components/PageList'
 import TextEditor from './components/TextEditor'
 import AIPanel from './components/AIPanel'
 import ExportPanel from './components/ExportPanel'
+import ConvertPanel from './components/ConvertPanel'
 import Toast from './components/Toast'
-import { extractDoc, saveEdits, translateDoc, exportDoc } from './api'
+import { extractDoc, saveEdits, translateDoc, exportDoc, getPipelineStatus } from './api'
+import { triggerDownload, readBlobError } from './utils/download'
 import './App.css'
 
 const LANG_LABELS = { ja: '日本語', en: 'English', zh: '中文' }
@@ -17,7 +19,10 @@ export default function App() {
   const [sourceLang, setSourceLang] = useState('ja')
   const [translations, setTranslations] = useState({})
   const [loading, setLoading] = useState(false)
+  const [loadingStage, setLoadingStage] = useState('')
+  const [loadingProgress, setLoadingProgress] = useState(0)
   const [toast, setToast] = useState(null)
+  const pollingRef = useRef(null)
 
   const showToast = (msg, type = 'info') => {
     setToast({ msg, type })
@@ -60,38 +65,68 @@ export default function App() {
   }, [file, pages, sourceLang])
 
   // ---- AI ----
+  const startPolling = useCallback((targetLangs) => {
+    if (pollingRef.current) clearInterval(pollingRef.current)
+    pollingRef.current = setInterval(async () => {
+      try {
+        const { data } = await getPipelineStatus(file.file_id)
+        setLoadingStage(data.stage || '')
+        setLoadingProgress(data.progress || 0)
+        if (!data.running) {
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
+          setLoading(false)
+          if (data.success !== false && !data.error) {
+            // 重新提取以获取完整结果
+            const extractData = await extractDoc(file.file_id)
+            const result = extractData.data
+            const trans = {}
+            const langs = Object.keys(result.sidecar?.translations || {})
+            for (const lang of langs) {
+              trans[lang] = result.sidecar?.final?.[lang] || []
+            }
+            setTranslations(trans)
+            showToast(
+              `Translated to ${targetLangs.map(l => LANG_LABELS[l] || l).join(', ')}`,
+              'success'
+            )
+          } else {
+            showToast('Translation failed: ' + (data.error || 'unknown error'), 'error')
+          }
+        }
+      } catch {
+        // 继续轮询
+      }
+    }, 2000)
+  }, [file])
+
   const handleTranslate = useCallback(async (targetLangs, glossary) => {
     if (!file) return
     setLoading(true)
+    setLoadingStage('Starting...')
     try {
-      const { data } = await translateDoc(file.file_id, sourceLang, targetLangs, glossary)
-      setTranslations(data.final_pages || data.translations || {})
-      showToast(
-        `Translated to ${targetLangs.map(l => LANG_LABELS[l] || l).join(', ')}` +
-        (data.stats ? ` | ${data.stats.en_terms_normalized || 0} terms aligned` : ''),
-        'success'
-      )
+      await translateDoc(file.file_id, sourceLang, targetLangs, glossary)
+      startPolling(targetLangs)
     } catch (e) {
-      showToast('Translation failed: ' + (e.response?.data?.detail || e.message), 'error')
-    } finally {
       setLoading(false)
+      showToast('Translation failed: ' + (e.response?.data?.detail || e.message), 'error')
     }
-  }, [file, sourceLang])
+  }, [file, sourceLang, startPolling])
 
   // ---- 导出 ----
   const handleExport = useCallback(async (targetLang, mode) => {
     if (!file) return
     try {
       const { data } = await exportDoc(file.file_id, targetLang, mode)
-      const url = URL.createObjectURL(data)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `tridoc_${targetLang}_${mode}.${file.file_type}`
-      a.click()
-      URL.revokeObjectURL(url)
-      showToast(`Exported: ${LANG_LABELS[targetLang] || targetLang} (${mode})`, 'success')
+      const result = triggerDownload(data, `tridoc_${targetLang}_${mode}.${file.file_type}`)
+      if (result.ok) {
+        showToast(`Exported: ${LANG_LABELS[targetLang] || targetLang} (${mode})`, 'success')
+      } else {
+        showToast(result.error, 'error')
+      }
     } catch (e) {
-      showToast('Export failed: ' + (e.response?.data?.detail || e.message), 'error')
+      const msg = await readBlobError(e)
+      showToast('Export failed: ' + msg, 'error')
     }
   }, [file])
 
@@ -129,6 +164,7 @@ export default function App() {
               translations={translations}
               onExport={handleExport}
             />
+            <ConvertPanel file={file} onToast={showToast} />
             <AIPanel
               sourceLang={sourceLang}
               onTranslate={handleTranslate}
@@ -150,7 +186,8 @@ export default function App() {
         ) : loading ? (
           <div className="placeholder">
             <div className="spinner" />
-            <p>Processing...</p>
+            <p>{loadingStage || 'Processing...'}</p>
+            {loadingProgress > 0 && <p className="sub">{loadingProgress}%</p>}
           </div>
         ) : (
           <>
@@ -176,7 +213,8 @@ export default function App() {
                 return (
                   <div key={lang} className="trans-block">
                     <span className={`badge ${lang}`}>{LANG_LABELS[lang] || lang}</span>
-                    <p>{currentText.slice(0, 200)}{currentText.length > 200 ? '...' : ''}</p>
+                    <span className="trans-page-label">Page {currentPage + 1}</span>
+                    <div className="trans-text">{currentText || <span className="muted">(empty)</span>}</div>
                   </div>
                 )
               })}

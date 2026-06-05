@@ -22,3 +22,6 @@ numpy>=1.26
 
 # Data Validation
 pydantic==2.10.3
+
+# Conversion
+pdf2docx==0.5.8
