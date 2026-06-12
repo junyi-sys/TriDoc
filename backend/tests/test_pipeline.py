@@ -153,7 +153,7 @@ def test_tfidf_term_extraction():
     candidate_texts = [c["text"] for c in candidates]
     print(f"TF-IDF 候选术语 ({len(candidates)}):")
     for c in candidates:
-        print(f"  '{c['text']}' — score={c['score']:.4f}, pages={c['pages']}")
+        print(f"  '{c["text"]}' — score={c["score"]:.4f}, pages={c["pages"]}")
 
     # "specification" 和 "Spec" 等变体应出现在候选列表中
     # 由于 n-gram 的特性，它们会以不同形式出现
@@ -259,9 +259,9 @@ def test_global_replacement():
     # 打印逐页替换明细
     print(f"\n逐页替换明细:")
     for log in result.page_log:
-        print(f"  页 {log['page']}: {log['total_in_page']} 处")
+        print(f"  页 {log["page"]}: {log["total_in_page"]} 处")
         for r in log["replacements"]:
-            print(f"    '{r['variant']}' → '{r['standard']}' (x{r['count']})")
+            print(f"    '{r["variant"]}' → '{r["standard"]}' (x{r["count"]})")
 
     print("\n[PASS] 全局替换验证通过")
 

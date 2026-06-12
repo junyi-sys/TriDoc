@@ -213,10 +213,10 @@ def extract_term_variants_gpt(
                 start = max(0, idx - 30)
                 end = min(len(text), idx + len(c["text"]) + 30)
                 snippet = text[start:end].replace("\n", " ")
-                examples.append(f"[页{p['page']}] ...{snippet}...")
+                examples.append(f"[页{p["page"]}] ...{snippet}...")
         if examples:
             candidate_summary.append(
-                f"候选词「{c['text']}」出现于: " + "; ".join(examples[:3])
+                f"候选词「{c["text"]}」出现于: " + "; ".join(examples[:3])
             )
 
     # Step 3: DeepSeek 语义分组

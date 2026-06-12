@@ -209,7 +209,7 @@ def stage2_translate(ctx: PipelineContext) -> PipelineContext:
                     tgt_lang,
                     exc,
                 )
-                translated_pages.append({**page, "text": f"[翻译失败] {page['text']}"})
+                translated_pages.append({**page, "text": f"[翻译失败] {page["text"]}"})
 
         ctx.translated[tgt_lang] = translated_pages
         logger.info("[Stage 2] →%s 翻译完成: %d 页", tgt_lang, len(translated_pages))

@@ -359,7 +359,8 @@ def test_stage0_glossary():
 if __name__ == "__main__":
     print("=" * 60)
     print("TriDoc AI Pipeline — COMPREHENSIVE SELF-TEST")
-    print(f"DeepSeek API: {'ONLINE' if DEEPSEEK_API_KEY else 'OFFLINE (TF-IDF fallback)'}")
+    status = "ONLINE" if DEEPSEEK_API_KEY else "OFFLINE (TF-IDF fallback)"
+    print(f"DeepSeek API: {status}")
     print("=" * 60)
 
     test_module_imports()

@@ -146,7 +146,7 @@ def download_conversion(
     return StreamingResponse(
         BytesIO(data.getvalue()),
         media_type=media_types.get(ext, "application/octet-stream"),
-        headers={"Content-Disposition": f'attachment; filename="converted_{file_id}{ext}"'},
+        headers={"Content-Disposition": f"attachment; filename=converted_{file_id}{ext}"},
     )
 
 

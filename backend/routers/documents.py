@@ -298,7 +298,7 @@ def export_translated(
     return StreamingResponse(
         buf,
         media_type=media_types.get(ext, "application/octet-stream"),
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
